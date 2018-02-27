@@ -46,14 +46,13 @@
   newobj instance void class Fooer`1<object>::.ctor() 
   ldtoken class Gen`1<class [mscorlib]System.Object> 
   callvirt instance bool class IFoo`1<class Gen`1<object>>::IsInst(valuetype [mscorlib]System.RuntimeTypeHandle) 
+  
   // If IFoo::IsInst returns true, return 100 else 0
   brtrue.s   PASS
-  
   ldc.i4 0
   br.s       FAIL
-  PASS:  ldc.i4   100
+  PASS:  ldc.i4 100
   FAIL:  nop
-
   ret
 }
 
