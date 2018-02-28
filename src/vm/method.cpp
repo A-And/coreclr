@@ -1671,7 +1671,7 @@ BOOL MethodDesc::RequiresInstArg()
     LIMITED_METHOD_DAC_CONTRACT;
 
     BOOL fRet = IsSharedByGenericInstantiations() &&
-        (HasMethodInstantiation() || IsStatic() || GetMethodTable()->IsValueType() || (GetMethodTable()->IsInterface() && !IsAbstract());
+        (HasMethodInstantiation() || IsStatic() || GetMethodTable()->IsValueType() || (GetMethodTable()->IsInterface() && !IsAbstract()));
 
     _ASSERT(fRet == (RequiresInstMethodTableArg() || RequiresInstMethodDescArg()));
     return fRet;
