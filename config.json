@@ -78,6 +78,12 @@
       "values": [],
       "defaultValue": "/l:BinClashLogger,Tools/net46/Microsoft.DotNet.Build.Tasks.dll;LogFile=binclash.log"
     },
+    "OutputPath": {
+      "description": "Project build output path",
+      "valueType":"property",
+      "values": [],
+      "defaultValue": ""
+    },
     "FilterToOSGroup": {
       "description": "Specifies the OSGroup.",
       "valueType": "property",

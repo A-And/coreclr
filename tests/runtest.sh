@@ -18,9 +18,13 @@ function print_usage {
     echo '  (Also required: Either --coreOverlayDir, or all of the switches --coreOverlayDir overrides)'
     echo ''
     echo 'Optional arguments:'
+    echo '  --coreclr-src=<path>             : Location of root of the directory'
+    echo '                                     containing the coreclr source files'
     echo '  --coreOverlayDir=<path>          : Directory containing core binaries and test dependencies. If not specified, the'
     echo '                                     default is testRootDir/Tests/coreoverlay. This switch overrides --coreClrBinDir,'
     echo '                                     --mscorlibDir, and --coreFxBinDir.'
+    echo '  --testHostDir=<path>             : Directory containing a built test host including core binaries, test dependencies' 
+    echo '                                     and a dotnet executable'
     echo '  --coreClrBinDir=<path>           : Directory of the CoreCLR build (e.g. coreclr/bin/Product/Linux.x64.Debug).'
     echo '  --mscorlibDir=<path>             : Directory containing the built mscorlib.dll. If not specified, it is expected to be'
     echo '                                       in the directory specified by --coreClrBinDir.'
@@ -45,7 +49,9 @@ function print_usage {
     echo '  --test-env                       : Script to set environment variables for tests'
     echo '  --copyNativeTestBin              : Explicitly copy native test components into the test dir'
     echo '  --crossgen                       : Precompiles the framework managed assemblies'
-    echo '  --runcrossgentests               : Runs the ready to run tests' 
+    echo '  --runcrossgentests               : Runs the ready to run tests'
+    echo '  --corefxtests                    : Runs CoreFX tests'
+    echo '  --corefxtestlist                 : Runs the CoreFX tests specified in the passed list'    
     echo '  --jitstress=<n>                  : Runs the tests with COMPlus_JitStress=n'
     echo '  --jitstressregs=<n>              : Runs the tests with COMPlus_JitStressRegs=n'
     echo '  --jitminopts                     : Runs the tests with COMPlus_JITMinOpts=1'
@@ -71,8 +77,6 @@ function print_usage {
     echo '  --coreclr-coverage               : Optional argument to get coreclr code coverage reports'
     echo '  --coreclr-objs=<path>            : Location of root of the object directory'
     echo '                                     containing the linux/mac coreclr build'
-    echo '  --coreclr-src=<path>             : Location of root of the directory'
-    echo '                                     containing the coreclr source files'
     echo '  --coverage-output-dir=<path>     : Directory where coverage output will be written to'
     echo ''
 }
@@ -407,9 +411,6 @@ function create_core_overlay {
     if [ ! -d "$coreClrBinDir" ]; then
         exit_with_error "$errorSource" "Directory specified by --coreClrBinDir does not exist: $coreClrBinDir"
     fi
-    if [ -z "$coreFxBinDir" ]; then
-        exit_with_error "$errorSource" "One of --coreOverlayDir or --coreFxBinDir must be specified." "$printUsage"
-    fi
 
     # Create the overlay
     coreOverlayDir=$testRootDir/Tests/coreoverlay
@@ -435,6 +436,65 @@ function create_core_overlay {
         rm -f "$coreOverlayDir/System.Private.CoreLib.ni.dll"
     fi
     copy_test_native_bin_to_test_root $coreOverlayDir
+}
+
+function create_testhost
+{
+    if [ ! -d "$testHostDir" ]; then
+        exit_with_error "$errorSource" "Did not find the test host directory: $testHostDir"
+    fi
+
+    # Initialize test variables
+    local buildToolsDir=$coreClrSrc/Tools
+    local dotnetExe=$buildToolsDir/dotnetcli/dotnet
+    local coreClrSrcTestDir=$coreClrSrc/tests
+    
+    if [ -z $coreClrBinDir ]; then
+        local coreClrBinDir=${coreClrSrc}/bin
+        export __CoreFXTestDir=${coreClrSrc}/bin/tests/CoreFX
+    else
+        export __CoreFXTestDir=${coreClrBinDir}/tests/CoreFX    
+    fi
+
+    local coreFXTestSetupUtilityName=CoreFX.TestUtils.TestFileSetup
+    local coreFXTestSetupUtility="${coreClrSrcTestDir}/src/Common/CoreFX/TestFileSetup/${coreFXTestSetupUtilityName}.csproj"
+    local coreFXTestSetupUtilityOutputPath=${__CoreFXTestDir}/TestUtilities
+    local coreFXTestBinariesOutputPath=${__CoreFXTestDir}/tests_downloaded
+    
+    if [ -z $CoreFXTestList]; then
+        local CoreFXTestList="${coreClrSrcTestDir}/CoreFX/TopN.CoreFX.Unix.issues.json"
+    fi
+
+    case "$(uname -s)" in
+        # Check if we're running under Linux
+        Linux)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_Linux.txt)
+        ;;
+        # Check if we're running under OSX        
+        Darwin)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_OSX.txt)
+        ;;        
+        # Default to Linux        
+        *)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_Linux.txt)
+        ;;
+    esac
+
+    local coreFXTestExecutable=xunit.console.netcore.exe
+    local coreFXLogDir=${coreClrBinDir}/Logs/CoreFX/
+    local coreFXTestExecutableArgs
+
+    buildCommand="${coreClrSrc}/run.sh build -Project=${coreFXTestSetupUtility} -OutputPath=${coreFXTestSetupUtilityOutputPath} -MsBuildEventLogging=\"/l:BinClashLogger,Tools/Microsoft.DotNet.Build.Tasks.dll;LogFile=binclash.log\""
+    # Invoke MSBuild
+    eval $buildCommand
+
+    chmod +x $dotnetExe
+    
+
+    runCommand="${dotnetExe} ${coreFXTestSetupUtilityOutputPath}/${coreFXTestSetupUtilityName}.dll --clean --outputDirectory ${coreFXTestBinariesOutputPath} --testListJsonPath ${CoreFXTestList} --runTests --dotnetPath ${testHostDir}/dotnet --testUrl ${coreFXTestRemoteURL} --executable ${coreFXTestExecutable} --log ${coreFXLogDir} ${coreFXTestExecutableArgs}"
+    echo $runCommand
+    eval $runCommand 
+    exit 0
 }
 
 declare -a skipCrossGenFiles
@@ -1168,6 +1228,16 @@ do
         --runcrossgentests)
             export RunCrossGen=1
             ;;
+        --corefxtests)
+            export RunCoreFXTests=1
+            ;;
+        --corefxtestlist)
+            export RunCoreFXTests=1
+            export CoreFXTestList=${i#*=} 
+            ;;
+        --testHostDir=*)
+            export testHostDir=${i#*=}
+            ;;
         --sequential)
             ((maxProcesses = 1))
             ;;
@@ -1237,6 +1307,34 @@ if ((disableEventLogging == 0)); then
 fi
 
 export COMPlus_gcServer="$serverGC"
+
+if [ "$RunCoreFXTests" == 1 ];
+then 
+    if [ -z "$testHostDir" ]; then
+        echo "--testHostDir is required to run CoreFX tests"
+        exit $EXIT_CODE_EXCEPTION
+    fi
+    
+    if [ ! -f "$testHostDir/dotnet" ]; then
+        echo "Executable dotnet not found in $testHostDir"
+        exit $EXIT_CODE_EXCEPTION
+    fi
+
+    if [ -z "$coreClrSrc" ]
+    then
+        echo "Coreclr src files are required to run CoreFX tests"
+        echo "Coreclr src files root path can be passed using '--coreclr-src' argument"
+        exit 1
+    fi
+
+    if [ ! -d "$testHostDir" ]; then
+        echo "Directory specified by --testHostDir does not exist: $testRootDir"
+        exit $EXIT_CODE_EXCEPTION
+    fi
+
+    create_testhost
+    exit 0
+fi
 
 if [ -z "$testRootDir" ]; then
     echo "--testRootDir is required."
