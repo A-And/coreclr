@@ -768,10 +768,18 @@ fi
 # This is where all built CoreClr libraries will copied to.
 export __CMakeBinDir="$__BinDir"
 echo check for $__BinDir
-if [ ! -d "$__BinDir" ] || [ ! -d "$__BinDir/bin" ]; then
+if [ ! -d "$__BinDir" ]; then
 
-    echo "Cannot find build directory for the CoreCLR Product or native tests."
+    echo "Cannot find build directory for the CoreCLR Product."
     echo "Please make sure CoreCLR and native tests are built before building managed tests."
+    echo "Example use: './build.sh $__BuildArch $__BuildType' "
+    exit 1
+fi
+
+if [[ (-z "$__GenerateLayoutOnly") && (-z "$__GenerateTestHostOnly") && (! -d "$__BinDir/bin") ]]; then
+    
+    echo "Cannot find build directory for the CoreCLR native tests."
+    echo "Please make sure native tests are built before building managed tests."
     echo "Example use: './build.sh $__BuildArch $__BuildType' without -skiptests switch"
     exit 1
 fi
@@ -792,13 +800,15 @@ initTargetDistroRid
 __CoreClrVersion=1.1.0
 __sharedFxDir=$__BuildToolsDir/dotnetcli/shared/Microsoft.NETCore.App/$__CoreClrVersion/
 
-echo "Building Tests..."
 
 if [[ (-z "$__GenerateLayoutOnly") && (-z "$__GenerateTestHostOnly") ]]; then
+    echo "Building Tests..."
     build_Tests
 else
+    echo "Generating test layout..."
     generate_layout
     if [ "$__GenerateTestHostOnly" ]; then
+        echo "Generating test host..."        
         generate_testhost
     fi
 fi
