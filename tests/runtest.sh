@@ -437,6 +437,65 @@ function create_core_overlay {
     copy_test_native_bin_to_test_root $coreOverlayDir
 }
 
+function create_testhost
+{
+    if [ ! -d "$testHostDir" ]; then
+        exit_with_error "$errorSource" "Did not find the test host directory: $testHostDir"
+    fi
+
+    # Initialize test variables
+    local buildToolsDir=$coreClrSrc/Tools
+    local dotnetExe=$buildToolsDir/dotnetcli/dotnet
+    local coreClrSrcTestDir=$coreClrSrc/tests
+    
+    if [ -z $coreClrBinDir ]; then
+        local coreClrBinDir=${coreClrSrc}/bin
+        export __CoreFXTestDir=${coreClrSrc}/bin/tests/CoreFX
+    else
+        export __CoreFXTestDir=${coreClrBinDir}/tests/CoreFX    
+    fi
+
+    local coreFXTestSetupUtilityName=CoreFX.TestUtils.TestFileSetup
+    local coreFXTestSetupUtility="${coreClrSrcTestDir}/src/Common/CoreFX/TestFileSetup/${coreFXTestSetupUtilityName}.csproj"
+    local coreFXTestSetupUtilityOutputPath=${__CoreFXTestDir}/TestUtilities
+    local coreFXTestBinariesOutputPath=${__CoreFXTestDir}/tests_downloaded
+    
+    if [ -z $CoreFXTestList]; then
+        local CoreFXTestList="${coreClrSrcTestDir}/CoreFX/TopN.CoreFX.Unix.issues.json"
+    fi
+
+    case "$(uname -s)" in
+        # Check if we're running under Linux
+        Linux)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_Linux.txt)
+        ;;
+        # Check if we're running under OSX        
+        Darwin)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_OSX.txt)
+        ;;        
+        # Default to Linux        
+        *)
+            local coreFXTestRemoteURL=$(<${coreClrSrcTestDir}/CoreFX/CoreFXTestListURL_Linux.txt)
+        ;;
+    esac
+
+    local coreFXTestExecutable=xunit.console.netcore.exe
+    local coreFXLogDir=${coreClrBinDir}/Logs/CoreFX/
+    local coreFXTestExecutableArgs=" --notrait category=nonnetcoreapptests --notrait category=nonosxtests --notrait category=failing --notrait category=IgnoreForCI --notrait category=OuterLoop --notrait Benchmark=true "
+
+    buildCommand="${coreClrSrc}/run.sh build -Project=${coreFXTestSetupUtility} -OutputPath=${coreFXTestSetupUtilityOutputPath} -MsBuildEventLogging=\"/l:BinClashLogger,Tools/Microsoft.DotNet.Build.Tasks.dll;LogFile=binclash.log\""
+    # Invoke MSBuild
+    eval $buildCommand
+
+    chmod +x $dotnetExe
+    
+
+    runCommand="${dotnetExe} ${coreFXTestSetupUtilityOutputPath}/${coreFXTestSetupUtilityName}.dll --clean --outputDirectory ${coreFXTestBinariesOutputPath} --testListJsonPath ${CoreFXTestList} --runTests --dotnetPath ${testHostDir}/dotnet --testUrl ${coreFXTestRemoteURL} --executable ${coreFXTestExecutable} --log ${coreFXLogDir} ${coreFXTestExecutableArgs}"
+    echo $runCommand
+    eval $runCommand 
+    exit 0
+}
+
 declare -a skipCrossGenFiles
 
 function is_skip_crossgen_test {

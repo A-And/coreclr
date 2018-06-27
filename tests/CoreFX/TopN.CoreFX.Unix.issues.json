@@ -1,6 +1,7 @@
 [
     {
         "name": "System.Collections.Tests",
+        "enabled":true,
         "exclusions": {
             "namespaces": null,
             "classes": null,
@@ -14,6 +15,7 @@
     },
     {
         "name": "System.Runtime.Extensions.Tests",
+        "enabled":true,
         "exclusions": {
             "namespaces": null,
             "classes": null,
@@ -22,6 +24,7 @@
     },
     {
         "name": "System.Runtime.Tests",
+        "enabled":true,
         "exclusions": {
             "namespaces": null,
             "classes": null,
@@ -30,6 +33,7 @@
     },
     {
         "name": "System.Threading.Tasks.Tests",
+        "enabled":true,
         "exclusions": {
             "namespaces": null,
             "classes": null,
@@ -38,6 +42,7 @@
     },
     {
         "name": "System.Threading.Tests",
+        "enabled":true,
         "exclusions": {
             "namespaces": null,
             "classes": null,
