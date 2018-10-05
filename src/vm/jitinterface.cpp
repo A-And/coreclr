@@ -1562,13 +1562,6 @@ void CEEInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
                 fieldFlags |= CORINFO_FLG_FIELD_INITCLASS;
         }
         else
-        if (pField->IsContextStatic())
-        {
-            fieldAccessor = CORINFO_FIELD_STATIC_ADDR_HELPER;
-
-            pResult->helper = CORINFO_HELP_GETSTATICFIELDADDR_CONTEXT;
-        }
-        else
         {
             // Regular or thread static
             CORINFO_FIELD_ACCESSOR intrinsicAccessor;
@@ -1620,7 +1613,6 @@ void CEEInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
         //
         if ((flags & CORINFO_ACCESS_ADDRESS) &&
             !pField->IsThreadStatic() &&
-            !pField->IsContextStatic() &&
             (fieldAccessor != CORINFO_FIELD_STATIC_TLS))
         {
             fieldFlags |= CORINFO_FLG_FIELD_SAFESTATIC_BYREF_RETURN;
