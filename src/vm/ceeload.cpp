@@ -10283,7 +10283,9 @@ Module *Module::GetModuleFromIndex(DWORD ix)
         if (IsReadyToRun())
         {
             //PRECONDITION(GetNativeImage()->CheckReadyToRunImportFromIndex(ix));
-            p = GetNativeOrReadyToRunImage()->GetReadyToRunImportFromIndex(ix);
+            //GetReadyToRunInfo()->GetReadyToRunImportFromIndex(ix);
+            RETURN ZapSig::DecodeModuleFromIndexes(this, ix, 0);
+
         }
         else 
         {

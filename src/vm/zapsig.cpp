@@ -641,7 +641,8 @@ Module *ZapSig::DecodeModuleFromIndexes(Module *fromModule,
     CONTRACTL_END;
 
     Assembly *pAssembly = NULL;
-
+    
+    // Ideally open a NativeHashTable here
     if (assemblyIndex == 0)
     {
         pAssembly = fromModule->GetAssembly();
@@ -672,6 +673,7 @@ Module *ZapSig::DecodeModuleFromIndexes(Module *fromModule,
         }
     }
 
+    // Will this break?
     if (moduleIndex == 0)
         return pAssembly->GetManifestModule();
     else
