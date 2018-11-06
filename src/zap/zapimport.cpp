@@ -69,7 +69,8 @@ ZapImportTable::ModuleReferenceEntry * ZapImportTable::GetModuleReference(CORINF
     pEntry->m_wAssemblyRid = (USHORT) assemblyIndex;
     pEntry->m_wModuleRid = (USHORT) moduleIndex;
 
-    pEntry->m_index = m_modules.GetCount();
+    // Set also equal to assemblyIndex
+    pEntry->m_index = (USHORT) assemblyIndex;
     m_modules.Append(pEntry);
 
     m_moduleReferences.Add(pEntry);
