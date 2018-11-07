@@ -449,19 +449,9 @@ public:
     ZapNode * GetHelperThunk(CorInfoHelpFunc ftnNum);
 
     // pUniqueId is used to allocate unique cells for cases where we cannot use the shared cell.
-    ZapNode * GetTypeHandleImport(TypeHandle th, PVOID pUniqueId = NULL);
-    ZapNode * GetMethodHandleImport(MethodDesc * pMD);
-    ZapNode * GetFieldHandleImport(FieldDesc * pFD);
-    ZapNode * GetModuleHandleImport(Module * pModule);
-    DWORD     GetModuleImportIndex(Module * pModule);
 
-    ZapNode * GetExistingTypeHandleImport(TypeHandle th);
     ZapNode * GetExistingMethodHandleImport(MethodDesc * pMD);
     ZapNode * GetExistingFieldHandleImport(FieldDesc * pFD);
-
-    ZapNode * GetVirtualImportThunk(MethodTable * pMT, MethodDesc * pMD, int slotNumber);
-
-    ZapNode * GetGenericSignature(PVOID signature, BOOL fMethod);
 
     void SavePrecode(PVOID ptr, MethodDesc * pMD, PrecodeType t, ItemKind kind, BOOL fIsPrebound = FALSE);
 
@@ -518,7 +508,6 @@ public:
     // This is obsolete in-place fixup that we should get rid of. For now, it is used for:
     // - FnPtrTypeDescs. These should not be stored in NGen images at all.
     // - stubs-as-il signatures. These should use tokens when stored in NGen image.
-    void FixupTypeHandlePointerInPlace(PVOID p, SSIZE_T offset, BOOL fForceFixup = FALSE);
 
     void BeginRegion(CorInfoRegionKind regionKind);
     void EndRegion(CorInfoRegionKind regionKind);

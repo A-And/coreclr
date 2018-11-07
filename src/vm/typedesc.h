@@ -125,7 +125,6 @@ public:
 
 #ifdef FEATURE_PREJIT
     void Save(DataImage *image);
-    void Fixup(DataImage *image);
 
     BOOL NeedsRestore(DataImage *image)
     {

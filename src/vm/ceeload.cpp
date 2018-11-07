@@ -10079,23 +10079,6 @@ void Module::Fixup(DataImage *image)
                             }
                             fSet = TRUE;
                         }
-                        else
-                        // Create the indirection only if the entry is hot or we do have indirection cell already
-                        if (hotItemValuePtr != NULL || image->GetExistingTypeHandleImport(th) != NULL)
-                        {
-                            _ASSERTE((flags & FIXUP_POINTER_INDIRECTION) == 0);
-
-                            ZapNode * pImport = image->GetTypeHandleImport(th);
-                            image->FixupFieldToNode(m_TypeRefToMethodTableMap.pTable, rid * sizeof(TADDR), 
-                                pImport, flags | FIXUP_POINTER_INDIRECTION, IMAGE_REL_BASED_RelativePointer);
-                            if (hotItemValuePtr != NULL)
-                            {
-                                image->FixupFieldToNode(m_TypeRefToMethodTableMap.hotItemList, 
-                                    (BYTE *)hotItemValuePtr - (BYTE *)m_TypeRefToMethodTableMap.hotItemList, 
-                                    pImport, flags | FIXUP_POINTER_INDIRECTION, IMAGE_REL_BASED_RelativePointer);
-                            }
-                            fSet = TRUE;
-                        }
                     }
 
                     if (!fSet)

@@ -228,7 +228,6 @@ void ZapImage::OutputEntrypointsTableForReadyToRun()
         if (pMethod->m_pFixupList != NULL)
         {
             NibbleWriter writer;
-            m_pImportTable->PlaceFixups(pMethod->m_pFixupList, writer);
 
             DWORD cbBlob;
             PVOID pBlob = writer.GetBlob(&cbBlob);

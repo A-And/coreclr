@@ -245,8 +245,6 @@ class ZapInfo
 
     BOOL CurrentMethodHasProfileData();
 
-    void embedGenericSignature(CORINFO_LOOKUP * pLookup);
-
     PVOID embedDirectCall(CORINFO_METHOD_HANDLE ftn, 
                           CORINFO_ACCESS_FLAGS accessFlags,
                           BOOL fAllowThunk);
@@ -374,8 +372,6 @@ public:
                       CORINFO_CONST_LOOKUP *  pResult);
 
 
-    void * getMethodSync(CORINFO_METHOD_HANDLE ftn,
-                         void **ppIndirection);
     void * getPInvokeUnmanagedTarget(CORINFO_METHOD_HANDLE method,
                                      void **ppIndirection);
     void * getAddressOfPInvokeFixup(CORINFO_METHOD_HANDLE method,

@@ -4783,23 +4783,6 @@ void MethodTable::Fixup(DataImage *image)
                 // Pointer to canonical methodtable
                 image->FixupPlainOrRelativeField(this, &MethodTable::m_pCanonMT, pCanonMT, UNION_METHODTABLE);
             }
-            else
-            {
-                // Pointer to lazy bound indirection cell to canonical methodtable
-                pImport = image->GetTypeHandleImport(pCanonMT);
-            }
-        }
-    else
-        {
-            // Pointer to eager bound indirection cell to canonical methodtable
-            _ASSERTE(pCanonMT->IsTypicalTypeDefinition() ||
-                     !pCanonMT->ContainsGenericVariables());
-            pImport = image->GetTypeHandleImport(pCanonMT);
-        }
-
-        if (pImport != NULL)
-        {
-            image->FixupPlainOrRelativeFieldToNode(this, &MethodTable::m_pCanonMT, pImport, UNION_INDIRECTION);
         }
     }
 
@@ -4835,10 +4818,6 @@ void MethodTable::Fixup(DataImage *image)
                 _ASSERTE(!IsParentMethodTableIndirectPointer());
                 image->FixupField(this, offsetof(MethodTable, m_pParentMethodTable), pParentMT, 0, relocType);
             }
-            else
-            {
-                pImport = image->GetTypeHandleImport(pParentMT);
-            }
         }
         else
         {
@@ -4854,16 +4833,6 @@ void MethodTable::Fixup(DataImage *image)
 
                 _ASSERTE(TypeFromToken(crExtends) == mdtTypeSpec);
 #endif
-
-                // Use unique cell for now since we are first going to set the parent method table to 
-                // approx one first, and then to the exact one later. This would mess up the shared cell.
-                // It would be nice to clean it up to use the shared cell - we should set the parent method table 
-                // just once at the end.
-                pImport = image->GetTypeHandleImport(pParentMT, this /* pUniqueId */);
-            }
-            else
-            {
-                pImport = image->GetTypeHandleImport(pParentMT);
             }
         }
 

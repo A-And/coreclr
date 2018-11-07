@@ -220,11 +220,6 @@ void ZapImage::OutputCode(CodeType codeType)
                 switch (type)
                 {
                 case ZapNodeType_StubDispatchCell:
-                    // Optimizations may create redundant references to the StubDispatchCell
-                    if (!pTarget->IsPlaced())
-                    {
-                        m_pStubDispatchDataTable->PlaceStubDispatchCell((ZapImport *)pTarget);
-                    }
                     break;
                 case ZapNodeType_MethodEntryPoint:
                     pTarget = m_pMethodEntryPoints->CanDirectCall((ZapMethodEntryPoint *)pTarget, pMethod);
@@ -255,20 +250,10 @@ void ZapImage::OutputCode(CodeType codeType)
                 case ZapNodeType_Import_ModuleHandle:
                 case ZapNodeType_Import_ClassHandle:
                 case ZapNodeType_Import_StringHandle:
-                case ZapNodeType_Import_Helper:
-                    // Place all potentially eager imports
-                    if (!pTarget->IsPlaced())
-                        m_pImportTable->PlaceImport((ZapImport *)pTarget);
-                    break;
-
                 case ZapNodeType_ExternalMethodThunk:
-                    if (!pTarget->IsPlaced())
-                        m_pExternalMethodDataTable->PlaceExternalMethodThunk((ZapImport *)pTarget);
                     break;
 
                 case ZapNodeType_ExternalMethodCell:
-                    if (!pTarget->IsPlaced())
-                        m_pExternalMethodDataTable->PlaceExternalMethodCell((ZapImport *)pTarget);
                     break;
 
 #ifdef FEATURE_READYTORUN_COMPILER
@@ -277,21 +262,12 @@ void ZapImage::OutputCode(CodeType codeType)
                         m_pDynamicHelperDataTable->PlaceDynamicHelperCell((ZapImport *)pTarget);
                     break;
 
-                case ZapNodeType_IndirectHelperThunk:
-                    if (!pTarget->IsPlaced())
-                        m_pImportTable->PlaceIndirectHelperThunk(pTarget);
-                    break;
-
                 case ZapNodeType_RVAFieldData:
                     if (!pTarget->IsPlaced())
                         m_pReadOnlyDataSection->Place(pTarget);
                     break;
 #endif
 
-                case ZapNodeType_GenericSignature:
-                    if (!pTarget->IsPlaced())
-                        m_pImportTable->PlaceBlob((ZapBlob *)pTarget);
-                    break;
                 default:
                     break;
                 }
@@ -462,9 +438,6 @@ void ZapImage::OutputCodeInfo(CodeType codeType)
             m_pExceptionInfoLookupTable->PlaceExceptionInfoEntry(pCode, pMethod->m_pExceptionInfo);
         }
 #endif // REDHAWK
-
-        if (pMethod->m_pFixupList != NULL && !IsReadyToRunCompilation())
-            pMethod->m_pFixupInfo = m_pImportTable->PlaceFixups(pMethod->m_pFixupList);
     }
 
     EndRegion(regionKind);
@@ -1287,13 +1260,7 @@ ZapNode * ZapUnwindData::GetPersonalityRoutine(ZapImage * pImage)
 {
     // Use different personality routine pointer for filter funclets so that we can quickly tell at runtime
     // whether funclet is a filter.
-#ifdef FEATURE_READYTORUN_COMPILER
-    if (IsReadyToRunCompilation())
-    {
-        ReadyToRunHelper helperNum = IsFilterFunclet() ? READYTORUN_HELPER_PersonalityRoutineFilterFunclet : READYTORUN_HELPER_PersonalityRoutine;
-        return pImage->GetImportTable()->GetPlacedIndirectHelperThunk(helperNum);
-    }
-#endif
+
     return pImage->GetHelperThunk(IsFilterFunclet() ? CORINFO_HELP_EE_PERSONALITY_ROUTINE_FILTER_FUNCLET : CORINFO_HELP_EE_PERSONALITY_ROUTINE);
 }
 

@@ -36,7 +36,6 @@ class ZapBlobWithRelocs;
 class ZapUnwindDataTable;
 #endif
 
-class ZapImportTable;
 class ZapImportSectionsTable;
 class ZapImportSectionSignatures;
 
@@ -145,7 +144,6 @@ class ZapImage
     friend class Zapper;
     friend class ZapInfo;
     friend class ZapILMetaData;
-    friend class ZapImportTable;
     friend class ZapCodeMethodDescs;
     friend class ZapColdCodeMap;
     friend class ZapReadyToRunHeader;
@@ -253,8 +251,6 @@ private:
     //
     // Auxiliary tables
     //
-    ZapImportTable *            m_pImportTable;
-
     ZapImportSectionsTable *    m_pImportSectionsTable;
 
     ZapInnerPtrTable *          m_pInnerPtrs;
@@ -719,11 +715,6 @@ public:
     ZapWrapperTable * GetWrappers()
     {
         return m_pWrappers;
-    }
-
-    ZapImportTable * GetImportTable()
-    {
-        return m_pImportTable;
     }
 
     ZapImportSectionsTable * GetImportSectionsTable()

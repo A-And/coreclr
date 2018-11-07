@@ -2344,18 +2344,6 @@ void FnPtrTypeDesc::Save(DataImage * image)
         DataImage::ITEM_FPTR_TYPEDESC);
 }
 
-void FnPtrTypeDesc::Fixup(DataImage * image)
-{
-    STANDARD_VM_CONTRACT;
-
-    for (DWORD i = 0; i <= m_NumArgs; i++)
-    {
-        image->FixupTypeHandlePointerInPlace(
-            this, 
-            (BYTE *)&m_RetAndArgTypes[i] - (BYTE *)this);
-    }
-}
-
 #endif //defined(FEATURE_NATIVE_IMAGE_GENERATION) && !defined(DACCESS_COMPILE)
 
 #ifdef DACCESS_COMPILE

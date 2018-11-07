@@ -842,13 +842,6 @@ void ZapInfo::getGSCookie(GSCookie * pCookieVal, GSCookie ** ppCookieVal)
 {
     *pCookieVal = 0;
 
-#ifdef FEATURE_READYTORUN_COMPILER
-    if (IsReadyToRunCompilation())
-    {
-        *ppCookieVal = (GSCookie *)m_pImage->GetImportTable()->GetHelperImport(READYTORUN_HELPER_GSCookie);
-        return;
-    }
-#endif
 
     *ppCookieVal = (GSCookie *)m_pImage->GetInnerPtr(m_pImage->m_pEEInfoTable,
         offsetof(CORCOMPILE_EE_INFO_TABLE, gsCookie));
@@ -1442,18 +1435,9 @@ CORINFO_MODULE_HANDLE ZapInfo::embedModuleHandle(CORINFO_MODULE_HANDLE handle,
             return (CORINFO_MODULE_HANDLE)m_pImage->m_pPreloadSections[CORCOMPILE_SECTION_MODULE];
         }
 
-        *ppIndirection = m_pImage->GetImportTable()->GetModuleHandleImport(handle);
-    }
-    else
-    {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetModuleHandleImport(handle);
-        AppendConditionalImport(pImport);
-        
-        *ppIndirection = pImport;
     }
     return NULL;
 }
-
 //
 // The following functions indicate whether a handle can be directly embedded into
 // the code being compiled, or if it needs to be accessed with a (fixable) indirection.
@@ -1488,15 +1472,6 @@ CORINFO_CLASS_HANDLE ZapInfo::embedClassHandle(CORINFO_CLASS_HANDLE handle,
             *ppIndirection = NULL;
             return CORINFO_CLASS_HANDLE(m_pImage->GetWrappers()->GetClassHandle(handle));
         }
-
-        *ppIndirection = m_pImage->GetImportTable()->GetClassHandleImport(handle);
-    }
-    else
-    {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetClassHandleImport(handle);
-        AppendConditionalImport(pImport);
-
-        *ppIndirection = pImport;
     }
     return NULL;
 }
@@ -1530,10 +1505,6 @@ CORINFO_FIELD_HANDLE ZapInfo::embedFieldHandle(CORINFO_FIELD_HANDLE handle,
     }
 
 
-    ZapImport * pImport = m_pImage->GetImportTable()->GetFieldHandleImport(handle);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -1559,10 +1530,6 @@ CORINFO_METHOD_HANDLE ZapInfo::embedMethodHandle(CORINFO_METHOD_HANDLE handle,
         return CORINFO_METHOD_HANDLE(m_pImage->GetWrappers()->GetMethodHandle(handle));
     }
 
-    ZapImport * pImport = m_pImage->GetImportTable()->GetMethodHandleImport(handle);
-    AppendConditionalImport(pImport);
-    
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -1592,9 +1559,6 @@ ZapInfo::embedGenericHandle(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 
     if (pResult->lookup.lookupKind.needsRuntimeLookup)
     {
-        if (!IsReadyToRunCompilation())
-            embedGenericSignature(&pResult->lookup);
-
         if (pResult->handleType == CORINFO_HANDLETYPE_METHOD)
         {
             // There is no easy way to detect method referenced via generic lookups in generated code.
@@ -1610,50 +1574,23 @@ ZapInfo::embedGenericHandle(CORINFO_RESOLVED_TOKEN * pResolvedToken,
         switch (pResult->handleType)
         {
         case CORINFO_HANDLETYPE_CLASS:
-            if (IsReadyToRunCompilation())
-            {
-                ZapImport * pImport = m_pImage->GetImportTable()->GetClassImport(ENCODE_TYPE_HANDLE, pResolvedToken);
-                AppendConditionalImport(pImport);
-                pIndirection = pImport;
-                handle = NULL;
-            }
-            else
-            {
-                CORINFO_CLASS_HANDLE clsHnd = (CORINFO_CLASS_HANDLE) pResult->compileTimeHandle;
-                handle = CORINFO_GENERIC_HANDLE(embedClassHandle(clsHnd, &pIndirection));
-            }
+        {
+            CORINFO_CLASS_HANDLE clsHnd = (CORINFO_CLASS_HANDLE)pResult->compileTimeHandle;
+            handle = CORINFO_GENERIC_HANDLE(embedClassHandle(clsHnd, &pIndirection));
             break;
-
+        }
         case CORINFO_HANDLETYPE_METHOD:
-            if (IsReadyToRunCompilation())
-            {
-                ZapImport * pImport = m_pImage->GetImportTable()->GetMethodImport(ENCODE_METHOD_HANDLE, (CORINFO_METHOD_HANDLE)pResult->compileTimeHandle, pResolvedToken);
-                AppendConditionalImport(pImport);
-                pIndirection = pImport;
-                handle = NULL;
-            }
-            else
-            {
-                CORINFO_METHOD_HANDLE methHnd = (CORINFO_METHOD_HANDLE) pResult->compileTimeHandle;
-                handle =  CORINFO_GENERIC_HANDLE(embedMethodHandle(methHnd, &pIndirection));
-            }
+        {
+            CORINFO_METHOD_HANDLE methHnd = (CORINFO_METHOD_HANDLE) pResult->compileTimeHandle;
+            handle =  CORINFO_GENERIC_HANDLE(embedMethodHandle(methHnd, &pIndirection));
             break;
-
+        }
         case CORINFO_HANDLETYPE_FIELD:
-            if (IsReadyToRunCompilation())
-            {
-                ZapImport * pImport = m_pImage->GetImportTable()->GetFieldImport(ENCODE_FIELD_HANDLE, (CORINFO_FIELD_HANDLE)pResult->compileTimeHandle, pResolvedToken);
-                AppendConditionalImport(pImport);
-                pIndirection = pImport;
-                handle = NULL;
-            }
-            else
-            {
-                CORINFO_FIELD_HANDLE fldHnd = (CORINFO_FIELD_HANDLE) pResult->compileTimeHandle;
-                handle = CORINFO_GENERIC_HANDLE(embedFieldHandle(fldHnd, &pIndirection));
-            }
+        {
+            CORINFO_FIELD_HANDLE fldHnd = (CORINFO_FIELD_HANDLE)pResult->compileTimeHandle;
+            handle = CORINFO_GENERIC_HANDLE(embedFieldHandle(fldHnd, &pIndirection));
             break;
-
+        }
         default:
             ThrowHR(COR_E_BADIMAGEFORMAT, BFA_INVALID_TOKEN_TYPE);
         }
@@ -1668,23 +1605,6 @@ ZapInfo::embedGenericHandle(CORINFO_RESOLVED_TOKEN * pResolvedToken,
             pResult->lookup.constLookup.accessType   = IAT_PVALUE;
             pResult->lookup.constLookup.addr         = pIndirection;
         }
-    }
-}
-
-void ZapInfo::embedGenericSignature(CORINFO_LOOKUP * pLookup)
-{
-    _ASSERTE(pLookup->lookupKind.needsRuntimeLookup);
-
-    if (IsReadyToRunCompilation())
-    {
-		UNREACHABLE_MSG("We should never get here for the ReadyToRun compilation.");
-        ThrowHR(E_NOTIMPL);
-    }
-
-    if (pLookup->runtimeLookup.signature != NULL)
-    {
-        pLookup->runtimeLookup.signature = m_pImage->GetImportTable()->GetGenericSignature(
-            pLookup->runtimeLookup.signature, pLookup->lookupKind.runtimeLookupKind == CORINFO_LOOKUP_METHODPARAM);
     }
 }
 
@@ -1740,17 +1660,6 @@ void * ZapInfo::getHelperFtn (CorInfoHelpFunc ftnNum, void **ppIndirection)
         {
             m_zapper->Warning(W("ReadyToRun: JIT helper not supported: %S\n"), m_pEEJitInfo->getHelperName(ftnNum));
             ThrowHR(E_NOTIMPL);
-        }
-
-        if (fOptimizeForSize)
-        {
-            *ppIndirection = NULL;
-            return m_pImage->GetImportTable()->GetIndirectHelperThunk(helperNum);
-        }
-        else
-        {
-            *ppIndirection = m_pImage->GetImportTable()->GetHelperImport(helperNum);
-            return NULL;
         }
     }
 #endif
@@ -1878,7 +1787,6 @@ PVOID ZapInfo::embedDirectCall(CORINFO_METHOD_HANDLE ftn,
             return NULL;
         }
 
-        pEntryPointOrThunkToEmbed = m_pImage->GetImportTable()->GetExternalMethodThunk(ftn);
     }
 
 #ifdef _TARGET_ARM_
@@ -1911,15 +1819,6 @@ void ZapInfo::getFunctionEntryPoint(
         pResult->accessType = IAT_VALUE;
         pResult->addr       = entryPointOrThunkToEmbed;
     }
-    else
-    {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetFunctionEntryImport(ftn);
-        AppendConditionalImport(pImport);
-
-        // Tell the JIT to use an indirections
-        pResult->accessType   = IAT_PVALUE;
-        pResult->addr         = pImport;
-    }
 }
 
 void ZapInfo::getFunctionFixedEntryPoint(CORINFO_METHOD_HANDLE   ftn,
@@ -1938,29 +1837,8 @@ void ZapInfo::getFunctionFixedEntryPoint(CORINFO_METHOD_HANDLE   ftn,
         pResult->accessType   = IAT_VALUE;
         pResult->addr         = entryPointToEmbed;
     }
-    else
-    {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetFunctionEntryImport(ftn);
-        AppendConditionalImport(pImport);
-        
-        pResult->accessType   = IAT_PVALUE;
-        pResult->addr         = pImport;
-    }
 }
 
-void * ZapInfo::getMethodSync(CORINFO_METHOD_HANDLE ftn,
-                                            void **ppIndirection)
-{
-    _ASSERTE(ppIndirection != NULL);
-
-    CORINFO_CLASS_HANDLE classHandle = getMethodClass(ftn);
-
-    ZapImport * pImport = m_pImage->GetImportTable()->GetSyncLockImport(classHandle);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
-    return NULL;
-}
 
 void * ZapInfo::getPInvokeUnmanagedTarget(CORINFO_METHOD_HANDLE method, void **ppIndirection)
 {
@@ -1985,17 +1863,6 @@ void * ZapInfo::getAddressOfPInvokeFixup(CORINFO_METHOD_HANDLE method,void **ppI
         return PVOID(m_pImage->GetWrappers()->GetAddrOfPInvokeFixup(method));
     }
 
-    //
-    // Note we could a fixup to a direct call site, rather than to
-    // the indirection.  This would saves us an extra indirection, but changes the
-    // semantics slightly (so that the pinvoke will be bound when the calling
-    // method is first run, not at the exact moment of the first pinvoke.)
-    //
-
-    ZapImport * pImport = m_pImage->GetImportTable()->GetIndirectPInvokeTargetImport(method);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -2035,13 +1902,6 @@ CORINFO_JUST_MY_CODE_HANDLE ZapInfo::getJustMyCodeHandle(
 
 ZapImport * ZapInfo::GetProfilingHandleImport()
 {
-    if (m_pProfilingHandle == NULL)
-    {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetProfilingHandleImport(m_currentMethodHandle);
-        AppendImport(pImport);
-
-        m_pProfilingHandle = pImport;
-    }
 
     return m_pProfilingHandle;
 }
@@ -2140,18 +2000,14 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
         {
             if (pResult->stubLookup.lookupKind.needsRuntimeLookup)
             {
-				if (!IsReadyToRunCompilation())
-					embedGenericSignature(&pResult->stubLookup);
                 return;
             }
 
 #ifdef FEATURE_READYTORUN_COMPILER
             if (IsReadyToRunCompilation())
             {
-                ZapImport * pImport = m_pImage->GetImportTable()->GetStubDispatchCell(pResolvedToken);
 
                 pResult->stubLookup.constLookup.accessType   = IAT_PVALUE;
-                pResult->stubLookup.constLookup.addr         = pImport;
                 break;
             }
 #endif
@@ -2163,7 +2019,6 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
             //
             // Create the indirection cell
             //
-            pTarget = m_pImage->GetImportTable()->GetStubDispatchCell(calleeOwner, callee);
 
             pResult->stubLookup.constLookup.accessType = IAT_PVALUE;
 
@@ -2174,8 +2029,6 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 
     case CORINFO_CALL_CODE_POINTER:
         _ASSERTE(pResult->codePointerLookup.lookupKind.needsRuntimeLookup);
-		if (!IsReadyToRunCompilation())
-			embedGenericSignature(&pResult->codePointerLookup);
 
         // There is no easy way to detect method referenced via generic lookups in generated code.
         // Report this method reference unconditionally.
@@ -2190,22 +2043,8 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
             if (pResult->thisTransform != CORINFO_NO_THIS_TRANSFORM)
                 pConstrainedResolvedToken = NULL;
 
-            ZapImport * pImport;
-
-            if (flags & (CORINFO_CALLINFO_LDFTN | CORINFO_CALLINFO_ATYPICAL_CALLSITE))
-            {
-                pImport = m_pImage->GetImportTable()->GetMethodImport(ENCODE_METHOD_ENTRY, pResult->hMethod, pResolvedToken, pConstrainedResolvedToken);
-
-                AppendConditionalImport(pImport);
-            }
-            else
-            {
-                pImport = m_pImage->GetImportTable()->GetExternalMethodCell(pResult->hMethod, pResolvedToken, pConstrainedResolvedToken);
-            }
-
             // READYTORUN: FUTURE: Direct calls if possible
             pResult->codePointerLookup.constLookup.accessType   = IAT_PVALUE;
-            pResult->codePointerLookup.constLookup.addr         = pImport;
         }
 #endif
         break;
@@ -2221,11 +2060,7 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 		{
 			DWORD fAtypicalCallsite = (flags & CORINFO_CALLINFO_ATYPICAL_CALLSITE) ? CORINFO_HELP_READYTORUN_ATYPICAL_CALLSITE : 0;
 
-			ZapImport * pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-				(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_VIRTUAL_ENTRY | fAtypicalCallsite), pResult->hMethod, pResolvedToken);
-
 			pResult->codePointerLookup.constLookup.accessType = IAT_PVALUE;
-			pResult->codePointerLookup.constLookup.addr = pImport;
 
 			_ASSERTE(!pResult->sig.hasTypeArg());
 		}
@@ -2252,24 +2087,7 @@ void ZapInfo::getCallInfo(CORINFO_RESOLVED_TOKEN * pResolvedToken,
         }
         else
         {
-            ZapImport * pImport;
-            if (((SIZE_T)pResult->contextHandle & CORINFO_CONTEXTFLAGS_MASK) == CORINFO_CONTEXTFLAGS_METHOD)
-            {
-                CORINFO_METHOD_HANDLE exactMethodHandle = (CORINFO_METHOD_HANDLE)((SIZE_T)pResult->contextHandle & ~CORINFO_CONTEXTFLAGS_MASK);
-
-                pImport = m_pImage->GetImportTable()->GetMethodImport(ENCODE_METHOD_DICTIONARY, exactMethodHandle, 
-                    pResolvedToken, pConstrainedResolvedToken);
-            }
-            else
-            {
-                pImport = m_pImage->GetImportTable()->GetClassImport(ENCODE_TYPE_DICTIONARY,
-                    (pConstrainedResolvedToken != NULL) ? pConstrainedResolvedToken : pResolvedToken);
-            }
-
             pResult->instParamLookup.accessType   = IAT_PVALUE;
-            pResult->instParamLookup.addr         = pImport;
-
-            AppendConditionalImport(pImport);
         }
     }
 #endif
@@ -2314,11 +2132,6 @@ unsigned ZapInfo::getClassDomainID (CORINFO_CLASS_HANDLE cls, void **ppIndirecti
         }
     }
     
-    // We will have to insert a fixup
-    ZapImport * pImport = m_pImage->GetImportTable()->GetClassDomainIdImport(cls);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -2329,12 +2142,6 @@ void * ZapInfo::getFieldAddress(CORINFO_FIELD_HANDLE field, void **ppIndirection
     CORINFO_CLASS_HANDLE hClass = m_pEEJitInfo->getFieldClass(field);
 
     m_pImage->m_pPreloader->AddTypeToTransitiveClosureOfInstantiations(hClass);
-
-    ZapImport * pImport = m_pImage->GetImportTable()->GetStaticFieldAddressImport(field);
-    AppendConditionalImport(pImport);
-
-    // Field address is not aligned thus we can not store it in the same location as token.
-    *ppIndirection = m_pImage->GetInnerPtr(pImport, TARGET_POINTER_SIZE);
 
     return NULL;
 }
@@ -2364,14 +2171,6 @@ CORINFO_VARARGS_HANDLE ZapInfo::getVarArgsHandle(CORINFO_SIG_INFO *sig,
         return NULL;
     }
 
-    // @perf: If the sig cookie construction code actually will restore the value types in
-    // the sig, we should call LoadClass on all of those types to avoid redundant
-    // restore cookies.
-
-    ZapImport * pImport = m_pImage->GetImportTable()->GetVarArgImport(sig->scope, sig->token);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -2408,9 +2207,6 @@ void ZapInfo::addActiveDependency(CORINFO_MODULE_HANDLE moduleFrom, CORINFO_MODU
     }
     else
     {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetActiveDependencyImport(moduleFrom, moduleTo);
-        AppendImport(pImport);
-
         CORINFO_DEPENDENCY dep;
         dep.moduleFrom = moduleFrom;
         dep.moduleTo   = moduleTo;
@@ -2427,11 +2223,6 @@ InfoAccessType
         return emptyStringLiteral(ppValue);
     }
 
-    ZapImport * pImport = m_pImage->GetImportTable()->GetStringHandleImport(tokenScope, metaTok);
-    AppendConditionalImport(pImport);
-
-    *ppValue = pImport;
-
     return IAT_PPVALUE;
 }
 
@@ -2440,8 +2231,6 @@ InfoAccessType ZapInfo::emptyStringLiteral(void **ppValue)
 #ifdef FEATURE_READYTORUN_COMPILER
     if (IsReadyToRunCompilation())
     {
-        ZapImport * pImport = m_pImage->GetImportTable()->GetStringHandleImport(m_pImage->m_hModule, mdtString);
-        *ppValue = pImport;
         return IAT_PPVALUE;
     }
 #endif
@@ -2868,8 +2657,6 @@ void ZapInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
                 {
                 case ENCODE_FIELD_OFFSET:
                     {
-                        ZapImport * pImport = m_pImage->GetImportTable()->GetFieldImport(ENCODE_FIELD_OFFSET, pResolvedToken->hField, pResolvedToken);
-
                         if (pResult->offset > eeInfo.maxUncheckedOffsetForNullObject / 2)
                         {
                             m_zapper->Warning(W("ReadyToRun: Cross-module instance fields with large offsets not supported\n"));
@@ -2880,22 +2667,11 @@ void ZapInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
                         pResult->fieldAccessor = CORINFO_FIELD_INSTANCE_WITH_BASE;
 
                         pResult->fieldLookup.accessType = IAT_PVALUE;
-                        pResult->fieldLookup.addr = pImport;
-
-                        AppendImport(pImport);
-                    }
-                    break;
-
-                case ENCODE_CHECK_FIELD_OFFSET:
-                    {
-                        ZapImport * pImport = m_pImage->GetImportTable()->GetCheckFieldOffsetImport(pResolvedToken->hField, pResolvedToken, pResult->offset);
-                        AppendImport(pImport);
                     }
                     break;
 
                 case ENCODE_FIELD_BASE_OFFSET:
                     {
-                        ZapImport * pImport = m_pImage->GetImportTable()->GetClassImport(ENCODE_FIELD_BASE_OFFSET, pResolvedToken);
 
                         if (pResult->offset > eeInfo.maxUncheckedOffsetForNullObject / 2)
                         {
@@ -2908,9 +2684,6 @@ void ZapInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
                         pResult->fieldAccessor = CORINFO_FIELD_INSTANCE_WITH_BASE;
 
                         pResult->fieldLookup.accessType = IAT_PVALUE;
-                        pResult->fieldLookup.addr = pImport;
-
-                        AppendImport(pImport);
                     }
                     break;
 
@@ -2961,21 +2734,14 @@ void ZapInfo::getFieldInfo (CORINFO_RESOLVED_TOKEN * pResolvedToken,
                         UNREACHABLE_MSG("Unexpected static helper");
                     }
 
-                    ZapImport * pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-                        (CORCOMPILE_FIXUP_BLOB_KIND)(kind | fAtypicalCallsite), pResolvedToken->hClass);
 
                     pResult->fieldLookup.accessType = IAT_PVALUE;
-                    pResult->fieldLookup.addr = pImport;
 
                     pResult->helper = CORINFO_HELP_READYTORUN_STATIC_BASE;
                 }
                 else
                 {
-                    ZapImport * pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-                        (CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_FIELD_ADDRESS | fAtypicalCallsite), pResolvedToken->hField, pResolvedToken);
-
                     pResult->fieldLookup.accessType = IAT_PVALUE;
-                    pResult->fieldLookup.addr = pImport;
 
                     pResult->helper = CORINFO_HELP_READYTORUN_STATIC_BASE;
 
@@ -3288,10 +3054,6 @@ size_t ZapInfo::getClassModuleIdForStatics(CORINFO_CLASS_HANDLE cls, CORINFO_MOD
         module = NULL;
     }
 
-    ZapImport * pImport = m_pImage->GetImportTable()->GetModuleDomainIdImport(module, cls);
-    AppendConditionalImport(pImport);
-
-    *ppIndirection = pImport;
     return NULL;
 }
 
@@ -3304,9 +3066,6 @@ unsigned ZapInfo::getClassSize(CORINFO_CLASS_HANDLE cls)
     {
         if (m_pEECompileInfo->NeedsTypeLayoutCheck(cls))
         {
-            ZapImport * pImport = m_pImage->GetImportTable()->GetCheckTypeLayoutImport(cls);
-            AppendImport(pImport);
-
             m_ClassLoadTable.Load(cls, TRUE);
         }
     }
@@ -3435,29 +3194,21 @@ bool ZapInfo::getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 
 		if ((getClassAttribs(pResolvedToken->hClass) & CORINFO_FLG_SHAREDINST) != 0)
 			return false;   // Requires runtime lookup.
-		pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-			(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_NEW_HELPER | fAtypicalCallsite), pResolvedToken->hClass);
 		break;
 
 	case CORINFO_HELP_READYTORUN_NEWARR_1:
 		if ((getClassAttribs(pResolvedToken->hClass) & CORINFO_FLG_SHAREDINST) != 0)
 			return false;   // Requires runtime lookup.
-		pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-			(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_NEW_ARRAY_HELPER | fAtypicalCallsite), pResolvedToken->hClass);
 		break;
 
 	case CORINFO_HELP_READYTORUN_ISINSTANCEOF:
 		if ((getClassAttribs(pResolvedToken->hClass) & CORINFO_FLG_SHAREDINST) != 0)
 			return false;   // Requires runtime lookup.
-		pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-			(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_ISINSTANCEOF_HELPER | fAtypicalCallsite), pResolvedToken->hClass);
 		break;
 
 	case CORINFO_HELP_READYTORUN_CHKCAST:
 		if ((getClassAttribs(pResolvedToken->hClass) & CORINFO_FLG_SHAREDINST) != 0)
 			return false;   // Requires runtime lookup.
-		pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-			(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_CHKCAST_HELPER | fAtypicalCallsite), pResolvedToken->hClass);
 		break;
 
 	case CORINFO_HELP_READYTORUN_STATIC_BASE:
@@ -3465,8 +3216,6 @@ bool ZapInfo::getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 			return false;   // Requires runtime lookup.
 		if (m_pImage->GetCompileInfo()->IsInCurrentVersionBubble(m_pEEJitInfo->getClassModule(pResolvedToken->hClass)))
 		{
-			pImport = m_pImage->GetImportTable()->GetDynamicHelperCell(
-				(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_CCTOR_TRIGGER | fAtypicalCallsite), pResolvedToken->hClass);
 		}
 		else
 		{
@@ -3478,22 +3227,7 @@ bool ZapInfo::getReadyToRunHelper(CORINFO_RESOLVED_TOKEN * pResolvedToken,
 
 	case CORINFO_HELP_READYTORUN_GENERIC_HANDLE:
 		_ASSERTE(pGenericLookupKind != NULL && pGenericLookupKind->needsRuntimeLookup);
-		if (pGenericLookupKind->runtimeLookupKind == CORINFO_LOOKUP_METHODPARAM)
-		{
-			pImport = m_pImage->GetImportTable()->GetDictionaryLookupCell(
-				(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_DICTIONARY_LOOKUP_METHOD | fAtypicalCallsite), pResolvedToken, pGenericLookupKind);
-		}
-        else if (pGenericLookupKind->runtimeLookupKind == CORINFO_LOOKUP_THISOBJ)
-        {
-            pImport = m_pImage->GetImportTable()->GetDictionaryLookupCell(
-                (CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_DICTIONARY_LOOKUP_THISOBJ | fAtypicalCallsite), pResolvedToken, pGenericLookupKind);
-        }
-		else
-		{
-			_ASSERTE(pGenericLookupKind->runtimeLookupKind == CORINFO_LOOKUP_CLASSPARAM);
-			pImport = m_pImage->GetImportTable()->GetDictionaryLookupCell(
-				(CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_DICTIONARY_LOOKUP_TYPE | fAtypicalCallsite), pResolvedToken, pGenericLookupKind);
-		}
+		
 		break;
 
 	default:
@@ -3519,8 +3253,6 @@ void ZapInfo::getReadyToRunDelegateCtorHelper(
     _ASSERTE(IsReadyToRunCompilation());
     pLookup->lookupKind.needsRuntimeLookup = false;
     pLookup->constLookup.accessType = IAT_PVALUE;
-    pLookup->constLookup.addr = m_pImage->GetImportTable()->GetDynamicHelperCell(
-            (CORCOMPILE_FIXUP_BLOB_KIND)(ENCODE_DELEGATE_CTOR), pTargetMethod->hMethod, pTargetMethod, delegateType);
 #endif
 }
 
@@ -3901,8 +3633,6 @@ template<> void LoadTable<CORINFO_CLASS_HANDLE>::EmitLoadFixups(CORINFO_METHOD_H
     {
         CORINFO_CLASS_HANDLE handle = unfixed[j].handle;
         m_pModule->m_pPreloader->AddTypeToTransitiveClosureOfInstantiations(handle);
-        ZapImport * pImport = m_pModule->GetImportTable()->GetClassHandleImport(handle);
-        pZapInfo->AppendImport(pImport);
     }
 }
 
@@ -3942,8 +3672,6 @@ template<> void LoadTable<CORINFO_METHOD_HANDLE>::EmitLoadFixups(CORINFO_METHOD_
     {
         CORINFO_METHOD_HANDLE handle = unfixed[j].handle;
         m_pModule->m_pPreloader->AddMethodToTransitiveClosureOfInstantiations(handle);
-        ZapImport * pImport = m_pModule->GetImportTable()->GetMethodHandleImport(handle);
-        pZapInfo->AppendImport(pImport);
     }
 }
 

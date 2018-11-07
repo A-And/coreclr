@@ -3014,10 +3014,6 @@ FixupSignatureContainingInternalTypesParseType(
 
             if (!checkOnly)
             {
-                // Always force creation of fixup to avoid unaligned relocation entries. Unaligned
-                // relocations entries are perf hit for ASLR, and they even disable ASLR on ARM.
-                image->FixupTypeHandlePointerInPlace((BYTE *)pOriginalSig, (BYTE *)pTypeHandle - (BYTE *)pOriginalSig, TRUE);
-
                 // mark the signature so we know we'll need to restore it
                 BYTE *pImageSig = (BYTE *)image->GetImagePointer((PVOID)pOriginalSig);
                 *pImageSig |= IMAGE_CEE_CS_CALLCONV_NEEDSRESTORE;

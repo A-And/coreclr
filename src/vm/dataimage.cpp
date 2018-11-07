@@ -1125,80 +1125,6 @@ ZapNode * DataImage::GetHelperThunk(CorInfoHelpFunc ftnNum)
     return m_pZapImage->GetHelperThunk(ftnNum);
 }
 
-ZapNode * DataImage::GetTypeHandleImport(TypeHandle th, PVOID pUniqueId)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetClassHandleImport(CORINFO_CLASS_HANDLE(th.AsPtr()), pUniqueId);
-    if (!pImport->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceImport(pImport);
-    return pImport;
-}
-
-ZapNode * DataImage::GetMethodHandleImport(MethodDesc * pMD)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetMethodHandleImport(CORINFO_METHOD_HANDLE(pMD));
-    if (!pImport->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceImport(pImport);
-    return pImport;
-}
-
-ZapNode * DataImage::GetFieldHandleImport(FieldDesc * pMD)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetFieldHandleImport(CORINFO_FIELD_HANDLE(pMD));
-    if (!pImport->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceImport(pImport);
-    return pImport;
-}
-
-ZapNode * DataImage::GetModuleHandleImport(Module * pModule)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetModuleHandleImport(CORINFO_MODULE_HANDLE(pModule));
-    if (!pImport->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceImport(pImport);
-    return pImport;
-}
-
-DWORD DataImage::GetModuleImportIndex(Module * pModule)
-{
-    return m_pZapImage->GetImportTable()->GetIndexOfModule((CORINFO_MODULE_HANDLE)pModule);
-}
-
-ZapNode * DataImage::GetExistingTypeHandleImport(TypeHandle th)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetExistingClassHandleImport(CORINFO_CLASS_HANDLE(th.AsPtr()));
-    return (pImport != NULL && pImport->IsPlaced()) ? pImport : NULL;
-}
-
-ZapNode * DataImage::GetExistingMethodHandleImport(MethodDesc * pMD)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetExistingMethodHandleImport(CORINFO_METHOD_HANDLE(pMD));
-    return (pImport != NULL && pImport->IsPlaced()) ? pImport : NULL;
-}
-
-ZapNode * DataImage::GetExistingFieldHandleImport(FieldDesc * pFD)
-{
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetExistingFieldHandleImport(CORINFO_FIELD_HANDLE(pFD));
-    return (pImport != NULL && pImport->IsPlaced()) ? pImport : NULL;
-}
-
-ZapNode * DataImage::GetVirtualImportThunk(MethodTable * pMT, MethodDesc * pMD, int slotNumber)
-{
-    _ASSERTE(pMD == pMT->GetMethodDescForSlot(slotNumber));
-    _ASSERTE(!pMD->IsGenericMethodDefinition());
-
-    ZapImport * pImport = m_pZapImage->GetImportTable()->GetVirtualImportThunk(CORINFO_METHOD_HANDLE(pMD), slotNumber);
-    if (!pImport->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceVirtualImportThunk(pImport);
-    return pImport;
-}
-
-ZapNode * DataImage::GetGenericSignature(PVOID signature, BOOL fMethod)
-{
-    ZapGenericSignature * pGenericSignature = m_pZapImage->GetImportTable()->GetGenericSignature(signature, fMethod);
-    if (!pGenericSignature->IsPlaced())
-        m_pZapImage->GetImportTable()->PlaceBlob(pGenericSignature);
-    return pGenericSignature;
-}
-
 #if defined(_TARGET_X86_) || defined(_TARGET_AMD64_)
 
 class ZapStubPrecode : public ZapNode
@@ -1431,11 +1357,6 @@ void DataImage::FixupModulePointer(Module * pModule, PVOID p, SSIZE_T offset, Za
         {
             FixupField(p, offset, pModule, 0, type);
         }
-        else
-        {
-            ZapNode * pImport = GetModuleHandleImport(pModule);
-            FixupFieldToNode(p, offset, pImport, FIXUP_POINTER_INDIRECTION, type);
-        }
     }
 }
 
@@ -1448,11 +1369,6 @@ void DataImage::FixupMethodTablePointer(MethodTable * pMT, PVOID p, SSIZE_T offs
         if (CanEagerBindToMethodTable(pMT) && CanHardBindToZapModule(pMT->GetLoaderModule()))
         {
             FixupField(p, offset, pMT, 0, type);
-        }
-        else
-        {
-            ZapNode * pImport = GetTypeHandleImport(pMT);
-            FixupFieldToNode(p, offset, pImport, FIXUP_POINTER_INDIRECTION, type);
         }
     }
 }
@@ -1468,11 +1384,6 @@ void DataImage::FixupTypeHandlePointer(TypeHandle th, PVOID p, SSIZE_T offset, Z
             if (CanEagerBindToTypeHandle(th) && CanHardBindToZapModule(th.GetLoaderModule()))
             {
                 FixupField(p, offset, th.AsTypeDesc(), 2, type);
-            }
-            else
-            {
-                ZapNode * pImport = GetTypeHandleImport(th);
-                FixupFieldToNode(p, offset, pImport, FIXUP_POINTER_INDIRECTION, type);
             }
         }
         else
@@ -1493,11 +1404,6 @@ void DataImage::FixupMethodDescPointer(MethodDesc * pMD, PVOID p, SSIZE_T offset
         {
             FixupField(p, offset, pMD, 0, type);
         }
-        else
-        {
-            ZapNode * pImport = GetMethodHandleImport(pMD);
-            FixupFieldToNode(p, offset, pImport, FIXUP_POINTER_INDIRECTION, type);
-        }
     }
 }
 
@@ -1510,11 +1416,6 @@ void DataImage::FixupFieldDescPointer(FieldDesc * pFD, PVOID p, SSIZE_T offset, 
         if (CanEagerBindToFieldDesc(pFD) && CanHardBindToZapModule(pFD->GetLoaderModule()))
         {
             FixupField(p, offset, pFD, 0, type);
-        }
-        else
-        {
-            ZapNode * pImport = GetFieldHandleImport(pFD);
-            FixupFieldToNode(p, offset, pImport, FIXUP_POINTER_INDIRECTION, type);
         }
     }
 }
@@ -1771,29 +1672,6 @@ void DataImage::HardBindTypeHandlePointer(PVOID p, SSIZE_T offset)
     // - FnPtrTypeDescs. These should not be stored in NGen images at all.
     // - stubs-as-il signatures. These should use tokens when stored in NGen image.
     //
-void DataImage::FixupTypeHandlePointerInPlace(PVOID p, SSIZE_T offset, BOOL fForceFixup /*=FALSE*/)
-{
-    STANDARD_VM_CONTRACT;
-
-    TypeHandle thCopy = *(TypeHandle UNALIGNED*)((BYTE *)p + offset);
-
-    if (!thCopy.IsNull())
-    {
-        if (!fForceFixup &&
-            CanEagerBindToTypeHandle(thCopy) &&
-            CanHardBindToZapModule(thCopy.GetLoaderModule()))
-        {
-            HardBindTypeHandlePointer(p, offset);
-        }
-        else
-        {
-            ZapImport * pImport = m_pZapImage->GetImportTable()->GetClassHandleImport((CORINFO_CLASS_HANDLE)thCopy.AsPtr());
-
-            ZapNode * pBlob = m_pZapImage->GetImportTable()->PlaceImportBlob(pImport);
-            FixupFieldToNode(p, offset, pBlob, 0, IMAGE_REL_BASED_ABSOLUTE_TAGGED);
-        }
-    }
-}
 
 void DataImage::BeginRegion(CorInfoRegionKind regionKind)
 {

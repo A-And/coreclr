@@ -111,9 +111,6 @@ ZapImage::~ZapImage()
     // Destruction of auxiliary tables in alphabetical order
     //
 
-    if (m_pImportTable != NULL) 
-        m_pImportTable->~ZapImportTable();
-
     if (m_pInnerPtrs != NULL) 
         m_pInnerPtrs->~ZapInnerPtrTable();
 
@@ -147,9 +144,6 @@ void ZapImage::InitializeSections()
 
     m_pStubDispatchDataTable = new (GetHeap()) ZapImportSectionSignatures(this, m_pStubDispatchCellSection, m_pGCSection);
     m_pStubDispatchDataSection->Place(m_pStubDispatchDataTable);
-
-    m_pImportTable = new (GetHeap()) ZapImportTable(this);
-    m_pImportTableSection->Place(m_pImportTable);
 
     m_pGCInfoTable = new (GetHeap()) ZapGCInfoTable(this);
     m_pExceptionInfoLookupTable = new (GetHeap()) ZapExceptionInfoLookupTable(this);
@@ -228,9 +222,6 @@ void ZapImage::InitializeSectionsForReadyToRun()
         m_pHeaderSection->Place(pCompilerIdentifierBlob);
     }
 
-    m_pImportTable = new (GetHeap()) ZapImportTable(this);
-    m_pImportTableSection->Place(m_pImportTable);
-
     for (int i=0; i<ZapImportSectionType_Total; i++)
     {
         ZapVirtualSection * pSection;
@@ -275,12 +266,7 @@ void ZapImage::InitializeSectionsForReadyToRun()
     m_pInnerPtrs = new (GetHeap()) ZapInnerPtrTable(this);
 
     m_pExceptionInfoLookupTable = new (GetHeap()) ZapExceptionInfoLookupTable(this);
-
-    //
-    // Always allocate slot for module - it is used to determine that the image is used
-    //
-    m_pImportTable->GetPlacedHelperImport(READYTORUN_HELPER_Module);
-
+    
     //
     // Make sure the import sections table is in the image, so we can find the slot for module
     //
@@ -660,7 +646,6 @@ void ZapImage::Preallocate()
     //
     // Preallocation of auxiliary tables in alphabetical order
     //
-    m_pImportTable->Preallocate(cbILImage);
     m_pInnerPtrs->Preallocate(cbILImage);
     m_pMethodEntryPoints->Preallocate(cbILImage);
     m_pWrappers->Preallocate(cbILImage);
@@ -1165,8 +1150,6 @@ void ZapImage::PrintStats(LPCWSTR wszOutputFileName)
     ACCUM_SIZE(m_stats->m_dynamicInfoDelayListSize, m_pDelayLoadInfoDelayListSectionEager);
     ACCUM_SIZE(m_stats->m_dynamicInfoDelayListSize, m_pDelayLoadInfoDelayListSectionHot);
     ACCUM_SIZE(m_stats->m_dynamicInfoDelayListSize, m_pDelayLoadInfoDelayListSectionCold);
-
-    ACCUM_SIZE(m_stats->m_importTableSize, m_pImportTable);
 
     ACCUM_SIZE(m_stats->m_debuggingTableSize, m_pDebugSection);
     ACCUM_SIZE(m_stats->m_headerSectionSize, m_pGCSection);
