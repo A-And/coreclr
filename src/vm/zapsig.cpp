@@ -767,7 +767,7 @@ Module *ZapSig::DecodeModuleFromIndexesIfLoaded(Module *fromModule,
                         fValidAssemblyRef = FALSE;
                     }
                 }
-                
+
                 if (fValidAssemblyRef)
                 {
                     pAssembly = fromModule->GetAssemblyIfLoaded(
@@ -791,9 +791,9 @@ Module *ZapSig::DecodeModuleFromIndexesIfLoaded(Module *fromModule,
 
 
 TypeHandle ZapSig::DecodeType(Module *pEncodeModuleContext,
-                              Module *pInfoModule,
-                              PCCOR_SIGNATURE pBuffer,
-                              ClassLoadLevel level)
+    Module *pInfoModule,
+    PCCOR_SIGNATURE pBuffer,
+    ClassLoadLevel level)
 {
     CONTRACTL
     {
@@ -813,11 +813,11 @@ TypeHandle ZapSig::DecodeType(Module *pEncodeModuleContext,
     TypeHandle th = p.GetTypeHandleThrowing(pInfoModule,
                                             &typeContext,
                                             ClassLoader::LoadTypes,
-                                            level,                                            
+                                            level,
                                             level < CLASS_LOADED, // For non-full loads, drop a level when loading generic arguments
                                             NULL,
                                             pZapSigContext);
-                                            
+
     return th;
 }
 
@@ -856,6 +856,19 @@ MethodDesc *ZapSig::DecodeMethod(Module *pReferencingModule,
 
     TypeHandle thOwner = NULL;
 
+    // Module * dbg_infoModule;
+
+    // if (wcscmp(pInfoModule->GetDebugName(), L"test") != 0) {
+    //     int refModuleTest = wcscmp(pReferencingModule->GetDebugName(), L"test");
+    //     int refModuleMain = wcscmp(pReferencingModule->GetDebugName(), L"mainv1");
+    //     dbg_infoModule = pInfoModule;
+    // }
+    // else if (wcscmp(pInfoModule->GetDebugName(), L"mainv1") != 0) {
+    //     int refModuleTest = wcscmp(pReferencingModule->GetDebugName(), L"test");
+    //     int refModuleMain = wcscmp(pReferencingModule->GetDebugName(), L"mainv1");
+    //     dbg_infoModule = pReferencingModule;
+    // }
+
     if ( methodFlags & ENCODE_METHOD_SIG_OwnerType )
     {
         if (ppOwnerTypeSpecWithVars != NULL)
@@ -889,7 +902,7 @@ MethodDesc *ZapSig::DecodeMethod(Module *pReferencingModule,
         //
         RID rid;
         IfFailThrow(sig.GetData(&rid));
-
+        // MemberRef token is interpreted in the incorrect module
         if (methodFlags & ENCODE_METHOD_SIG_MemberRefToken)
         {
             if (thOwner.IsNull())
